@@ -1,0 +1,51 @@
+{
+  "organization": "Zambaiti",
+  "version": "1.0",
+  "jobs": [
+    {
+      "name": "Production-Servers-Daily",
+      "type": "incremental",
+      "schedule": ["Daily"],
+      "timeoutHours": 4,
+      "retentionDays": 30,
+      "targets": ["prod-web-*", "prod-app-*", "prod-db-*"],
+      "verifyAfterBackup": true,
+      "compression": "optimal"
+    },
+    {
+      "name": "Production-Servers-Weekly-Full",
+      "type": "full",
+      "schedule": ["Sunday"],
+      "timeoutHours": 8,
+      "retentionDays": 90,
+      "targets": ["prod-web-*", "prod-app-*", "prod-db-*"],
+      "verifyAfterBackup": true,
+      "replicateToAzure": true
+    },
+    {
+      "name": "Database-Servers-Hourly",
+      "type": "incremental",
+      "schedule": ["Daily"],
+      "intervalMinutes": 60,
+      "timeoutHours": 1,
+      "retentionDays": 14,
+      "targets": ["prod-db-*"],
+      "verifyAfterBackup": false
+    },
+    {
+      "name": "File-Servers-Daily",
+      "type": "incremental",
+      "schedule": ["Daily"],
+      "timeoutHours": 6,
+      "retentionDays": 60,
+      "targets": ["file-server-*"],
+      "verifyAfterBackup": true
+    }
+  ],
+  "alerting": {
+    "email": "it-admin@zambaiti.local",
+    "alertOnFailure": true,
+    "alertOnWarning": true,
+    "dailyReport": true
+  }
+}
