@@ -1,5 +1,5 @@
 {
-  "organization": "Zambaiti",
+  "organization": "Example Org",
   "version": "1.0",
   "jobs": [
     {
@@ -43,7 +43,7 @@
     }
   ],
   "alerting": {
-    "email": "it-admin@zambaiti.local",
+    "email": "it-admin@example.local",
     "alertOnFailure": true,
     "alertOnWarning": true,
     "dailyReport": true

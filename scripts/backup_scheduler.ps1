@@ -1,5 +1,4 @@
 # Backup Scheduler - Veeam Automation
-# IT Administrator - Zambaiti (2018-2019)
 #
 # Manages Veeam backup jobs with policy-based scheduling,
 # verification, and reporting.
@@ -98,11 +97,11 @@ function Test-BackupIntegrity {
 function Send-AlertEmail {
     param([string]$Subject, [string]$Body)
     $params = @{
-        From = "backup@zambaiti.local"
-        To = "it-admin@zambaiti.local"
+        From = "backup@example.local"
+        To = "it-admin@example.local"
         Subject = $Subject
         Body = $Body
-        SmtpServer = "smtp.zambaiti.local"
+        SmtpServer = "smtp.example.local"
     }
     Send-MailMessage @params
 }

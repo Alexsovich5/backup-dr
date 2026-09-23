@@ -1,5 +1,4 @@
 # Disaster Recovery Failover Script
-# IT Administrator - Zambaiti (2018-2019)
 
 param(
     [Parameter(Mandatory=$true)]
