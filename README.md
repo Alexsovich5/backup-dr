@@ -1,60 +1,29 @@
 # Enterprise Backup and Disaster Recovery
 
-![Project Status](https://img.shields.io/badge/Status-Complete-brightgreen)
-![Timeline](https://img.shields.io/badge/Timeline-October%202018%20--%20February%202019-blue)
-![Technology](https://img.shields.io/badge/Tech-Veeam%20%7C%20VMware%20%7C%20Azure%20%7C%20PowerShell-orange)
-
-## Project Overview
-
 Enterprise backup and disaster recovery solution using Veeam for VMware vSphere environments with Azure cloud replication and automated failover procedures.
 
-**Role**: IT Administrator
-**Organization**: Zambaiti
-**Duration**: October 2018 - February 2019
-**Project**: #25 of 30 in IT Career Portfolio
+Personal project, built to explore scripting Veeam backup scheduling and failover in PowerShell. It is not production software — see **Status** below for exactly what is and isn't implemented.
 
-## Business Impact
+## Status
 
-- **RPO < 15 minutes**: Near-real-time replication to Azure
-- **RTO < 1 hour**: Automated failover procedures
-- **100% Backup Success Rate**: Comprehensive verification
-- **Compliance Ready**: Automated retention policy enforcement
+**Implemented**
 
-## Technology Stack
+- Backup scheduler script driven by `config/backup_policy.json`
+- Disaster-recovery failover script
 
-- **Veeam Backup & Replication 9.5**: Enterprise backup
-- **VMware vSphere 6.5**: Virtualization platform
-- **Azure Site Recovery**: Cloud DR target
-- **PowerShell 5.1**: Automation scripts
+**Not implemented / known limitations**
 
-## Project Structure
+- No Azure replication or health-check scripts (the earlier README claimed these; they did not exist)
+- Requires Veeam PowerShell snap-ins; never run against a real Veeam installation
+- No Pester tests
+
+## Layout
 
 ```
-backup-dr/
-├── README.md
-├── scripts/
-│   ├── backup_scheduler.ps1
-│   ├── disaster_recovery.ps1
-│   ├── azure_replication.ps1
-│   └── health_check.ps1
-├── config/
-│   ├── backup_policy.json
-│   └── dr_plan.json
-├── docs/
-│   └── runbook.md
-└── tests/
-    └── test_backup.ps1
+config/
+  backup_policy.json
+scripts/
+  backup_scheduler.ps1
+  disaster_recovery.ps1
 ```
 
-## Contributing
-
-This is a historical project from October 2018 - February 2019, preserved for portfolio purposes.
-
-## License
-
-Professional portfolio project - Zambaiti
-
----
-
-**Developed during October 2018 - February 2019**
-*Part of Alexander Efrem's IT Career Portfolio (2012-2024)*
