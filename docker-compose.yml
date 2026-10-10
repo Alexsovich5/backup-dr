@@ -1,0 +1,26 @@
+version: "3.7"
+
+services:
+  app:
+    build: .
+    image: backup-dr:dev
+    volumes:
+      - .:/src
+    working_dir: /src
+    environment:
+      BACKUPDR_PROVIDER: simulator
+      BACKUPDR_SMTP_SERVER: mailhog
+      BACKUPDR_SMTP_PORT: "1025"
+    depends_on:
+      - mailhog
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.0
+    ports:
+      - "21025:8025"
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.60.0.0/24

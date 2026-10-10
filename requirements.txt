@@ -1,0 +1,2 @@
+# Optional host-side tool: `make COMPOSE=docker-compose` uses the standalone compose CLI.
+docker-compose==1.23.2
