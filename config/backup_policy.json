@@ -1,6 +1,6 @@
 {
   "organization": "Example Org",
-  "version": "1.0",
+  "version": "1.1",
   "jobs": [
     {
       "name": "Production-Servers-Daily",
@@ -44,8 +44,14 @@
   ],
   "alerting": {
     "email": "it-admin@example.local",
+    "from": "backup@example.local",
+    "smtpServer": "smtp.example.local",
+    "smtpPort": 25,
     "alertOnFailure": true,
     "alertOnWarning": true,
     "dailyReport": true
+  },
+  "health": {
+    "repositoryMinFreePercent": 15
   }
 }

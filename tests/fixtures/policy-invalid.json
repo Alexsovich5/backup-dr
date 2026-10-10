@@ -1,0 +1,59 @@
+{
+  "organization": "Example Org",
+  "version": "1.1",
+  "jobs": [
+    {
+      "name": "Nightly-Files",
+      "type": "incremental",
+      "schedule": ["Daily"],
+      "timeoutHours": 2,
+      "retentionDays": 14
+    },
+    {
+      "name": "Nightly-Files",
+      "type": "incremental",
+      "schedule": ["Daily"],
+      "timeoutHours": 2,
+      "retentionDays": 14
+    },
+    {
+      "name": "Archive-Differential",
+      "type": "differential",
+      "schedule": ["Daily"],
+      "timeoutHours": 2,
+      "retentionDays": 30
+    },
+    {
+      "name": "Weekend-Full",
+      "type": "full",
+      "schedule": ["Sunday", "Funday"],
+      "timeoutHours": 8,
+      "retentionDays": 90
+    },
+    {
+      "name": "Zero-Timeout",
+      "type": "incremental",
+      "schedule": ["Daily"],
+      "timeoutHours": 0,
+      "retentionDays": 7
+    },
+    {
+      "name": "Too-Frequent",
+      "type": "incremental",
+      "schedule": ["Daily"],
+      "intervalMinutes": 5,
+      "timeoutHours": 1,
+      "retentionDays": 7
+    }
+  ],
+  "alerting": {
+    "email": "it-admin@example.local",
+    "from": "backup@example.local",
+    "smtpServer": "smtp.example.local",
+    "smtpPort": 25,
+    "alertOnFailure": true,
+    "alertOnWarning": true,
+    "dailyReport": true
+  },
+  "health": { "repositoryMinFreePercent": 15 }
+}
