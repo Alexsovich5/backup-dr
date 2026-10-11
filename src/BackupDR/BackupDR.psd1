@@ -8,6 +8,7 @@
     FunctionsToExport    = @(
         'Get-BackupPolicy',
         'Set-BackupLogPath',
+        'Start-BackupJob',
         'Test-BackupJobDue'
     )
     CmdletsToExport      = @()
