@@ -8,6 +8,7 @@
     FunctionsToExport    = @(
         'ConvertTo-BackupReportHtml',
         'Get-AzureReplicationStatus',
+        'Get-BackupServerHealth',
         'Get-BackupJobReport',
         'Get-BackupPolicy',
         'Get-DRPlan',
