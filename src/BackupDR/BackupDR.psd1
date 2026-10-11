@@ -7,7 +7,8 @@
     CompatiblePSEditions = @('Desktop', 'Core')
     FunctionsToExport    = @(
         'Get-BackupPolicy',
-        'Set-BackupLogPath'
+        'Set-BackupLogPath',
+        'Test-BackupJobDue'
     )
     CmdletsToExport      = @()
     VariablesToExport    = @()
