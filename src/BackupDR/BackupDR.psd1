@@ -7,6 +7,7 @@
     CompatiblePSEditions = @('Desktop', 'Core')
     FunctionsToExport    = @(
         'ConvertTo-BackupReportHtml',
+        'Get-AzureReplicationStatus',
         'Get-BackupJobReport',
         'Get-BackupPolicy',
         'Get-DRPlan',
