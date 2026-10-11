@@ -7,6 +7,7 @@
     CompatiblePSEditions = @('Desktop', 'Core')
     FunctionsToExport    = @(
         'Get-BackupPolicy',
+        'Send-BackupAlert',
         'Set-BackupLogPath',
         'Start-BackupJob',
         'Test-BackupJobDue'

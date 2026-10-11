@@ -17,6 +17,11 @@ function Start-BackupJob {
     .PARAMETER PollSeconds
         Seconds between session checks. Defaults to $env:BACKUPDR_POLL_SECONDS, else 60.
         0 is allowed (no wait between checks; the number of checks stays bounded).
+    .PARAMETER Alerting
+        The policy's alerting block. When given, an Error or NotFound outcome and a Failed,
+        Timeout or Unknown result send 'Backup FAILED: <job>' if alertOnFailure is true; a
+        Warning result sends 'Backup WARNING: <job>' if alertOnWarning is true. Mail goes
+        through Send-BackupAlert, so SMTP problems are logged and do not change the outcome.
     .EXAMPLE
         Start-BackupJob -Job $policy.jobs[0] -PollSeconds 30
     #>
@@ -29,7 +34,9 @@ function Start-BackupJob {
         [switch]$DryRun,
 
         [ValidateRange(0, 86400)]
-        [int]$PollSeconds
+        [int]$PollSeconds,
+
+        [psobject]$Alerting
     )
 
     if (-not $PSBoundParameters.ContainsKey('PollSeconds')) {
@@ -117,6 +124,22 @@ function Start-BackupJob {
         $outcome.Outcome = 'Error'
         $outcome.Message = $_.Exception.Message
         Write-BackupLog -Level 'ERROR' -Message "Backup error for ${jobName}: $($outcome.Message)"
+    }
+
+    if ($Alerting) {
+        $severity = $null
+        if (@('Error', 'NotFound') -contains $outcome.Outcome -or
+            @('Failed', 'Timeout', 'Unknown') -contains $outcome.Result) {
+            if ($Alerting.alertOnFailure -eq $true) { $severity = 'FAILED' }
+        }
+        elseif ($outcome.Result -eq 'Warning') {
+            if ($Alerting.alertOnWarning -eq $true) { $severity = 'WARNING' }
+        }
+
+        if ($severity) {
+            $body = "Job: $jobName`r`nOutcome: $($outcome.Outcome)`r`nResult: $($outcome.Result)`r`n$($outcome.Message)"
+            Send-BackupAlert -Alerting $Alerting -Subject "Backup ${severity}: $jobName" -Body $body
+        }
     }
 
     $outcome
