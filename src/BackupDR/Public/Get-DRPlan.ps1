@@ -11,6 +11,9 @@ function Get-DRPlan {
           azure_failover  recoveryPlan
           dns_update      zone, record, failoverIp, primaryIp
           notification    to
+        The names the steps act on (veeam_replica target, azure_failover recoveryPlan,
+        azure.vaultName and azure.recoveryPlan) must be exact names without wildcard
+        characters, and dns_update failoverIp and primaryIp must be dotted IPv4 addresses.
         All problems are collected and reported in a single error.
     .EXAMPLE
         $plan = Get-DRPlan -Path .\config\dr_plan.json
@@ -50,6 +53,28 @@ function Get-DRPlan {
         $problems.Add('rpoThresholdMinutes must be greater than 0')
     }
 
+    $isWildcard = {
+        param([string]$Value)
+        [System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($Value)
+    }
+    $isIPv4 = {
+        param([string]$Value)
+        $match = [regex]::Match($Value, '^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$')
+        if (-not $match.Success) { return $false }
+        foreach ($group in @($match.Groups | Select-Object -Skip 1)) {
+            if ([int]$group.Value -gt 255) { return $false }
+        }
+        $true
+    }
+
+    if ($null -ne $plan.azure) {
+        foreach ($field in @('vaultName', 'recoveryPlan')) {
+            if (& $isWildcard ([string]$plan.azure.$field)) {
+                $problems.Add("azure.$field must be an exact name without wildcard characters (* ? [ ])")
+            }
+        }
+    }
+
     $steps = @($plan.failoverSteps | Where-Object { $null -ne $_ })
     if ($steps.Count -eq 0) {
         $problems.Add('failoverSteps: at least one step is required')
@@ -81,6 +106,18 @@ function Get-DRPlan {
             foreach ($field in $requiredFields[$type]) {
                 if ([string]::IsNullOrWhiteSpace([string]$step.$field)) {
                     $problems.Add("${label}: $type requires '$field'")
+                }
+            }
+            $exactNameFields = @{ veeam_replica = 'target'; azure_failover = 'recoveryPlan' }
+            if ($exactNameFields.ContainsKey($type) -and (& $isWildcard ([string]$step.($exactNameFields[$type])))) {
+                $problems.Add("${label}: '$($exactNameFields[$type])' must be an exact name without wildcard characters (* ? [ ])")
+            }
+            if ($type -eq 'dns_update') {
+                foreach ($field in @('failoverIp', 'primaryIp')) {
+                    $value = [string]$step.$field
+                    if (-not [string]::IsNullOrWhiteSpace($value) -and -not (& $isIPv4 $value)) {
+                        $problems.Add("${label}: $field '$value' is not an IPv4 address")
+                    }
                 }
             }
         }

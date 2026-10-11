@@ -3,7 +3,8 @@ function Invoke-AzureFailoverStep {
     .SYNOPSIS
         Runs an azure_failover DR step against an Azure Site Recovery recovery plan.
     .DESCRIPTION
-        Sets the ASR vault context from -VaultName, looks up the step's recoveryPlan and then:
+        Sets the ASR vault context from -VaultName, looks up the step's recoveryPlan (both by
+        exact name, exactly one match; see Resolve-ExactVendorObject) and then:
           failover  Start-AzureRmRecoveryServicesAsrUnplannedFailoverJob -Direction PrimaryToRecovery
           failback  Start-AzureRmRecoveryServicesAsrPlannedFailoverJob -Direction RecoveryToPrimary
           test      only the vault and recovery plan lookups
@@ -43,20 +44,20 @@ function Invoke-AzureFailoverStep {
         throw "Azure failover step '$($Step.name)' has no vault: set azure.vaultName in the DR plan"
     }
 
-    $vault = @(Get-AzureRmRecoveryServicesVault -Name $VaultName) | Select-Object -First 1
-    if (-not $vault) {
-        throw "Recovery Services vault '$VaultName' not found"
+    $vault = Resolve-ExactVendorObject -Kind 'Recovery Services vault' -Name $VaultName -Lookup {
+        param($n)
+        Get-AzureRmRecoveryServicesVault -Name $n
     }
     Set-AzureRmRecoveryServicesAsrVaultContext -Vault $vault | Out-Null
 
     $planName = [string]$Step.recoveryPlan
-    try {
-        $recoveryPlan = @(Get-AzureRmRecoveryServicesAsrRecoveryPlan -Name $planName) | Select-Object -First 1
-    } catch {
-        throw "ASR recovery plan '$planName' not found in vault '$VaultName': $($_.Exception.Message)"
-    }
-    if (-not $recoveryPlan) {
-        throw "ASR recovery plan '$planName' not found in vault '$VaultName'"
+    $recoveryPlan = Resolve-ExactVendorObject -Kind 'ASR recovery plan' -Name $planName -Lookup {
+        param($n)
+        try {
+            Get-AzureRmRecoveryServicesAsrRecoveryPlan -Name $n
+        } catch {
+            throw "ASR recovery plan '$n' not found in vault '$VaultName': $($_.Exception.Message)"
+        }
     }
 
     if ($Action -eq 'test') {

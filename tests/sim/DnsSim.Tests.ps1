@@ -53,6 +53,16 @@ Describe 'DnsSim' -Tag 'Unit' {
             { Get-DnsServerResourceRecord -ZoneName 'example.local' -Name 'nothing' } | Should -Throw 'Failed to get nothing record'
         }
 
+        It 'Get-DnsServerResourceRecord reports a name with no records as ObjectNotFound' {
+            $category = $null
+            try {
+                Get-DnsServerResourceRecord -ZoneName 'example.local' -Name 'nothing' -ErrorAction Stop
+            } catch {
+                $category = $_.CategoryInfo.Category
+            }
+            $category | Should -Be ([System.Management.Automation.ErrorCategory]::ObjectNotFound)
+        }
+
         It 'remove then add swaps the IP and the change is persisted to JSON' {
             Remove-DnsServerResourceRecord -ZoneName 'example.local' -Name 'app' -RRType A -Force
             @(Get-SeededRecord -Name 'app').Count | Should -Be 0

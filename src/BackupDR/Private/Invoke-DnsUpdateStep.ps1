@@ -9,6 +9,8 @@ function Invoke-DnsUpdateStep {
           test      only the zone check
         The old address is removed only when the record currently holds it, and the new
         address is added only when it is not already there, so a repeated run is harmless.
+        A record that does not exist yet (ObjectNotFound) counts as holding no address; any
+        other error reading it stops the step before anything is changed.
     #>
     [CmdletBinding()]
     [OutputType([string])]
@@ -47,10 +49,15 @@ function Invoke-DnsUpdateStep {
 
     $current = @()
     try {
-        $current = @(Get-DnsServerResourceRecord -ZoneName $zone -Name $record -RRType 'A' |
+        $current = @(Get-DnsServerResourceRecord -ZoneName $zone -Name $record -RRType 'A' -ErrorAction Stop |
             ForEach-Object { [string]$_.RecordData.IPv4Address })
     } catch {
-        # The real cmdlet throws when the name has no records; treat that as empty.
+        # The real cmdlet reports a name without records as ObjectNotFound; that means "no
+        # address yet". Any other error (access denied, server down) must not be read as
+        # empty, or the new address would be added next to the old one.
+        if ($_.CategoryInfo.Category -ne [System.Management.Automation.ErrorCategory]::ObjectNotFound) {
+            throw "DNS record '$record' in zone '$zone' cannot be read: $($_.Exception.Message)"
+        }
         $current = @()
     }
 

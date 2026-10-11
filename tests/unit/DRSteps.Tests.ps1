@@ -9,8 +9,10 @@ function global:Register-HealthyVendorMocks {
         [pscustomobject]@{ Name = 'prod-db-01_replica'; VmName = 'prod-db-01'; IsReplica = $true; State = 'Ready' }
     }
     Mock -ModuleName BackupDR Get-VBRRestorePoint {
-        [pscustomobject]@{ Id = 'rp-old'; ReplicaName = 'prod-db-01_replica'; CreationTime = [datetime]'2019-02-17T00:00:00' }
-        [pscustomobject]@{ Id = 'rp-new'; ReplicaName = 'prod-db-01_replica'; CreationTime = [datetime]'2019-02-17T01:00:00' }
+        [pscustomobject]@{ Id = 'rp-old'; Name = 'prod-db-01'; VmName = 'prod-db-01'; ReplicaName = 'prod-db-01_replica'
+            CreationTime = [datetime]'2019-02-17T00:00:00' }
+        [pscustomobject]@{ Id = 'rp-new'; Name = 'prod-db-01'; VmName = 'prod-db-01'; ReplicaName = 'prod-db-01_replica'
+            CreationTime = [datetime]'2019-02-17T01:00:00' }
     }
     Mock -ModuleName BackupDR Start-VBRViReplicaFailover {
         [pscustomobject]@{ Name = 'prod-db-01_replica Failover'; State = 'Stopped'; Result = 'Success' }
@@ -96,6 +98,65 @@ InModuleScope BackupDR {
                 { Invoke-VeeamReplicaStep -Step $replicaStep -Action failover } | Should -Throw 'has no restore point'
             }
 
+            It 'refuses a target with wildcard characters without looking it up' {
+                Register-HealthyVendorMocks
+                $step = [pscustomobject]@{ name = 'R'; type = 'veeam_replica'; target = 'prod-db-*' }
+
+                { Invoke-VeeamReplicaStep -Step $step -Action failover } | Should -Throw 'wildcard'
+                Assert-MockCalled -ModuleName BackupDR Get-VBRReplica -Times 0 -Exactly -Scope It
+                Assert-MockCalled -ModuleName BackupDR Start-VBRViReplicaFailover -Times 0 -Exactly -Scope It
+            }
+
+            It 'refuses to fail over when two replicas have the target name' {
+                Register-HealthyVendorMocks
+                Mock -ModuleName BackupDR Get-VBRReplica {
+                    [pscustomobject]@{ Name = 'prod-db-01_replica'; IsReplica = $true; State = 'Ready' }
+                    [pscustomobject]@{ Name = 'prod-db-01_replica'; IsReplica = $true; State = 'Ready' }
+                }
+
+                { Invoke-VeeamReplicaStep -Step $replicaStep -Action failover } | Should -Throw 'matches 2 objects'
+                Assert-MockCalled -ModuleName BackupDR Start-VBRViReplicaFailover -Times 0 -Exactly -Scope It
+            }
+
+            It 'does not fail over a replica whose name only starts with the target' {
+                Register-HealthyVendorMocks
+                Mock -ModuleName BackupDR Get-VBRReplica {
+                    [pscustomobject]@{ Name = 'prod-db-01_replica_old'; IsReplica = $true; State = 'Ready' }
+                }
+
+                { Invoke-VeeamReplicaStep -Step $replicaStep -Action failover } | Should -Throw "replica 'prod-db-01_replica' not found"
+                Assert-MockCalled -ModuleName BackupDR Start-VBRViReplicaFailover -Times 0 -Exactly -Scope It
+            }
+
+            It 'refuses to pick a restore point when the replica holds more than one VM' {
+                Register-HealthyVendorMocks
+                Mock -ModuleName BackupDR Get-VBRRestorePoint {
+                    [pscustomobject]@{ Id = 'rp-db'; Name = 'prod-db-01'; CreationTime = [datetime]'2019-02-17T00:00:00' }
+                    [pscustomobject]@{ Id = 'rp-web'; Name = 'prod-web-01'; CreationTime = [datetime]'2019-02-17T01:00:00' }
+                }
+
+                { Invoke-VeeamReplicaStep -Step $replicaStep -Action failover } | Should -Throw 'more than one VM'
+                Assert-MockCalled -ModuleName BackupDR Start-VBRViReplicaFailover -Times 0 -Exactly -Scope It
+            }
+
+            It 'refuses to pick between two newest restore points with the same time' {
+                Register-HealthyVendorMocks
+                Mock -ModuleName BackupDR Get-VBRRestorePoint {
+                    [pscustomobject]@{ Id = 'rp-a'; Name = 'prod-db-01'; CreationTime = [datetime]'2019-02-17T01:00:00' }
+                    [pscustomobject]@{ Id = 'rp-b'; Name = 'prod-db-01'; CreationTime = [datetime]'2019-02-17T01:00:00' }
+                }
+
+                { Invoke-VeeamReplicaStep -Step $replicaStep -Action failback } | Should -Throw 'newest restore point'
+                Assert-MockCalled -ModuleName BackupDR Start-VBRViReplicaFailback -Times 0 -Exactly -Scope It
+            }
+
+            It 'throws when the failover returns no session' {
+                Register-HealthyVendorMocks
+                Mock -ModuleName BackupDR Start-VBRViReplicaFailover { }
+
+                { Invoke-VeeamReplicaStep -Step $replicaStep -Action failover } | Should -Throw "result ''"
+            }
+
             It 'throws when the failover session result is Failed' {
                 Register-HealthyVendorMocks
                 Mock -ModuleName BackupDR Start-VBRViReplicaFailover {
@@ -167,6 +228,35 @@ InModuleScope BackupDR {
                 { Invoke-AzureFailoverStep -Step $azureStep -Action failover -VaultName 'rsv-dr' } | Should -Throw "vault 'rsv-dr' not found"
             }
 
+            It 'refuses to fail over when two recovery plans have the step name' {
+                Register-HealthyVendorMocks
+                Mock -ModuleName BackupDR Get-AzureRmRecoveryServicesAsrRecoveryPlan {
+                    [pscustomobject]@{ Name = 'rp-primary'; CurrentSite = 'Primary' }
+                    [pscustomobject]@{ Name = 'rp-primary'; CurrentSite = 'Primary' }
+                }
+
+                { Invoke-AzureFailoverStep -Step $azureStep -Action failover -VaultName 'rsv-dr' } | Should -Throw 'matches 2 objects'
+                Assert-MockCalled -ModuleName BackupDR Start-AzureRmRecoveryServicesAsrUnplannedFailoverJob -Times 0 -Exactly -Scope It
+            }
+
+            It 'does not fail over a recovery plan whose name only starts with the step name' {
+                Register-HealthyVendorMocks
+                Mock -ModuleName BackupDR Get-AzureRmRecoveryServicesAsrRecoveryPlan {
+                    [pscustomobject]@{ Name = 'rp-primary-old'; CurrentSite = 'Primary' }
+                }
+
+                { Invoke-AzureFailoverStep -Step $azureStep -Action failover -VaultName 'rsv-dr' } | Should -Throw "recovery plan 'rp-primary' not found"
+                Assert-MockCalled -ModuleName BackupDR Start-AzureRmRecoveryServicesAsrUnplannedFailoverJob -Times 0 -Exactly -Scope It
+            }
+
+            It 'refuses a vault name with wildcard characters' {
+                Register-HealthyVendorMocks
+
+                { Invoke-AzureFailoverStep -Step $azureStep -Action failover -VaultName 'rsv-*' } | Should -Throw 'wildcard'
+                Assert-MockCalled -ModuleName BackupDR Get-AzureRmRecoveryServicesVault -Times 0 -Exactly -Scope It
+                Assert-MockCalled -ModuleName BackupDR Start-AzureRmRecoveryServicesAsrUnplannedFailoverJob -Times 0 -Exactly -Scope It
+            }
+
             It 'throws when no vault name is given' {
                 Register-HealthyVendorMocks
 
@@ -217,12 +307,26 @@ InModuleScope BackupDR {
 
             It 'adds the record when it does not exist yet' {
                 Register-HealthyVendorMocks
-                Mock -ModuleName BackupDR Get-DnsServerResourceRecord { throw 'Failed to get app record in example.local zone' }
+                Mock -ModuleName BackupDR Get-DnsServerResourceRecord {
+                    throw (New-Object System.Management.Automation.ErrorRecord (
+                            (New-Object System.Exception 'Failed to get app record in example.local zone on server dns01.'),
+                            'WIN32 9714,Get-DnsServerResourceRecord',
+                            [System.Management.Automation.ErrorCategory]::ObjectNotFound, 'app'))
+                }
 
                 Invoke-DnsUpdateStep -Step $dnsStep -Action failover | Out-Null
 
                 Assert-MockCalled -ModuleName BackupDR Remove-DnsServerResourceRecord -Times 0 -Exactly -Scope It
                 Assert-MockCalled -ModuleName BackupDR Add-DnsServerResourceRecordA -Times 1 -Exactly -Scope It -ParameterFilter { @($IPv4Address) -contains '10.20.0.10' }
+            }
+
+            It 'stops without changing the record when the record cannot be read for another reason' {
+                Register-HealthyVendorMocks
+                Mock -ModuleName BackupDR Get-DnsServerResourceRecord { throw 'Access is denied.' }
+
+                { Invoke-DnsUpdateStep -Step $dnsStep -Action failover } | Should -Throw 'cannot be read'
+                Assert-MockCalled -ModuleName BackupDR Remove-DnsServerResourceRecord -Times 0 -Exactly -Scope It
+                Assert-MockCalled -ModuleName BackupDR Add-DnsServerResourceRecordA -Times 0 -Exactly -Scope It
             }
 
             It 'throws when the zone does not exist' {
@@ -246,6 +350,14 @@ InModuleScope BackupDR {
                     $SmtpServer -eq 'smtp.example.local' -and
                     $Subject -eq 'DR failover: Primary-Site-To-Azure' -and $Body -match 'Fail over DB replica: Succeeded'
                 }
+            }
+
+            It 'fails the step when the relay does not accept the mail' {
+                Register-HealthyVendorMocks
+                Mock -ModuleName BackupDR Send-MailMessage { throw 'relay refused connection' }
+
+                { Invoke-NotificationStep -Step $notifyStep -Action failover -Alerting $alerting -PlanName 'P' } |
+                    Should -Throw 'not sent'
             }
 
             It 'throws when no alerting settings are available' {

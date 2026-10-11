@@ -84,6 +84,11 @@ Describe 'Get-BackupPolicy' -Tag 'Unit' {
             Get-ValidationMessage $path | Should -Match 'jobs\[2\]: name is required'
         }
 
+        It 'rejects a job name with wildcard characters' {
+            $path = Write-PolicyFile { param($p) $p.jobs[0].name = 'Production-*' }
+            Get-ValidationMessage $path | Should -Match "job 'Production-\*': name must not contain wildcard characters"
+        }
+
         It 'rejects an unknown job type' {
             $path = Write-PolicyFile { param($p) $p.jobs[0].type = 'differential' }
             Get-ValidationMessage $path | Should -Match "job 'Production-Servers-Daily': type 'differential' is not one of incremental, full"

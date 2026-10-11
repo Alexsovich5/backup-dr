@@ -16,8 +16,9 @@ services:
 
   mailhog:
     image: mailhog/mailhog:v1.0.0
+    # MailHog has no authentication: publish its web UI/API on the loopback interface only.
     ports:
-      - "21025:8025"
+      - "127.0.0.1:21025:8025"
 
 networks:
   default:

@@ -162,6 +162,19 @@ Describe 'backup_scheduler.ps1 against the simulator' -Tag 'Integration' {
         @($subjects | Where-Object { $_ -like 'Backup FAILED:*' }).Count | Should -Be 1
     }
 
+    It 'exits 1 and mails "Backup FAILED" when a job stops without a known result' {
+        Initialize-SchedulerRun -Now $sunday
+        $state = Read-VeeamState
+        ($state.jobs | Where-Object { $_.name -eq 'File-Servers-Daily' }).nextResult = 'None'
+        Write-VeeamState $state
+
+        $run = Invoke-Scheduler -Now $sunday
+
+        $run.ExitCode | Should -Be 1
+        $subjects = @(Get-MailHogMessages | ForEach-Object { $_.Subject })
+        $subjects | Should -Contain 'Backup FAILED: File-Servers-Daily'
+    }
+
     It 'writes the report file with one row per policy job and mails the daily report' {
         Initialize-SchedulerRun -Now $sunday
 

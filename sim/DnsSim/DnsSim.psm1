@@ -6,8 +6,8 @@
 #              copied to a new temp directory on first use.
 #
 # Errors follow the real cmdlets: a missing zone, a lookup of a name with no
-# records, adding a duplicate record and removing a record that does not exist
-# all throw. Only A records are modelled.
+# records (category ObjectNotFound), adding a duplicate record and removing a
+# record that does not exist all throw. Only A records are modelled.
 
 $script:SampleDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'state'
 $script:Culture = [System.Globalization.CultureInfo]::InvariantCulture
@@ -139,7 +139,12 @@ function Get-DnsServerResourceRecord {
     if ($Name) { $records = @($records | Where-Object { $_.hostName -eq $Name }) }
     if ($RRType) { $records = @($records | Where-Object { $_.recordType -eq $RRType }) }
     if ($Name -and $records.Count -eq 0) {
-        throw "Failed to get $Name record in $ZoneName zone on server $(Get-SimServerName)."
+        # Like the real cmdlet, a name without records is an ObjectNotFound error.
+        $exception = New-Object System.Exception "Failed to get $Name record in $ZoneName zone on server $(Get-SimServerName)."
+        $errorRecord = New-Object System.Management.Automation.ErrorRecord @(
+            $exception, 'WIN32 9714,Get-DnsServerResourceRecord',
+            [System.Management.Automation.ErrorCategory]::ObjectNotFound, $Name)
+        $PSCmdlet.ThrowTerminatingError($errorRecord)
     }
     foreach ($record in $records) {
         ConvertTo-SimRecord -Record $record -ZoneName $ZoneName

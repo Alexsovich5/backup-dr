@@ -3,7 +3,8 @@ function Get-BackupPolicy {
     .SYNOPSIS
         Loads backup_policy.json and validates it.
     .DESCRIPTION
-        Every job must have a unique, non-empty name, a type of incremental or full,
+        Every job must have a unique, non-empty name without wildcard characters (it is
+        matched exactly against the Veeam job name), a type of incremental or full,
         a schedule made of weekday names or Daily, timeoutHours greater than 0,
         retentionDays of at least 1 and, when present, intervalMinutes of at least 15.
         All problems are collected and reported in a single error.
@@ -46,6 +47,9 @@ function Get-BackupPolicy {
                 $label = "jobs[$index]"
             } else {
                 $label = "job '$name'"
+                if ([System.Management.Automation.WildcardPattern]::ContainsWildcardCharacters($name)) {
+                    $problems.Add("${label}: name must not contain wildcard characters (* ? [ ]); it is matched exactly against the Veeam job name")
+                }
                 if ($seenNames.ContainsKey($name)) {
                     if ($seenNames[$name] -eq 1) {
                         $problems.Add("duplicate job name '$name'")

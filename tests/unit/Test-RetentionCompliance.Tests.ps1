@@ -181,6 +181,29 @@ Describe 'Test-RetentionCompliance' -Tag 'Unit' {
         }
     }
 
+    Context 'exact backup lookup' {
+        It 'does not audit a backup whose name only starts with the job name' {
+            Mock -ModuleName BackupDR Get-VBRBackup { [pscustomobject]@{ Name = 'Job-A-Archive'; JobName = 'Job-A-Archive' } }
+            Mock -ModuleName BackupDR Get-VBRRestorePoint { throw 'should not be called' }
+
+            $result = Test-RetentionCompliance -Policy (New-TestPolicy -Name 'Job-A') -Now $now
+
+            $result.Compliant | Should -Be $false
+            ($result.Issues -join '; ') | Should -Match 'no backup found'
+            Assert-MockCalled -ModuleName BackupDR Get-VBRRestorePoint -Times 0 -Exactly -Scope It
+        }
+
+        It 'throws instead of auditing an arbitrary backup when two backups have the job name' {
+            Mock -ModuleName BackupDR Get-VBRBackup {
+                [pscustomobject]@{ Name = 'Job-A'; JobName = 'Job-A' }
+                [pscustomobject]@{ Name = 'Job-A'; JobName = 'Job-A' }
+            }
+            Mock -ModuleName BackupDR Get-VBRRestorePoint { }
+
+            { Test-RetentionCompliance -Policy (New-TestPolicy -Name 'Job-A') -Now $now } | Should -Throw 'matches 2 objects'
+        }
+    }
+
     Context 'shipped policy' {
         It 'returns one result per policy job in policy order' {
             $policy = Get-BackupPolicy -Path $ShippedPolicy

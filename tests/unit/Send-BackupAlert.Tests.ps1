@@ -71,6 +71,34 @@ Describe 'Send-BackupAlert' -Tag 'Unit' {
         Assert-MockCalled -ModuleName BackupDR Send-MailMessage -Scope It -Times 0 -Exactly
         Get-Content -Path $script:logFile -Raw | Should -Match '\[WARN\].*recipient'
     }
+
+    It 'returns nothing without -PassThru' {
+        Mock -ModuleName BackupDR Send-MailMessage { }
+
+        $output = @(Send-BackupAlert -Alerting (New-Alerting) -Subject 'S' -Body 'B')
+
+        $output.Count | Should -Be 0
+    }
+
+    It 'returns $true with -PassThru when the mail was handed to the relay' {
+        Mock -ModuleName BackupDR Send-MailMessage { }
+
+        Send-BackupAlert -Alerting (New-Alerting) -Subject 'S' -Body 'B' -PassThru | Should -Be $true
+    }
+
+    It 'returns $false with -PassThru when the relay fails' {
+        Mock -ModuleName BackupDR Send-MailMessage { throw 'relay refused connection' }
+
+        Send-BackupAlert -Alerting (New-Alerting) -Subject 'S' -Body 'B' -PassThru | Should -Be $false
+    }
+
+    It 'returns $false with -PassThru when settings are missing' {
+        Mock -ModuleName BackupDR Send-MailMessage { }
+        $alerting = New-Alerting
+        $alerting.smtpServer = ''
+
+        Send-BackupAlert -Alerting $alerting -Subject 'S' -Body 'B' -PassThru | Should -Be $false
+    }
 }
 
 Describe 'Start-BackupJob alerting' -Tag 'Unit' {
@@ -104,10 +132,13 @@ Describe 'Start-BackupJob alerting' -Tag 'Unit' {
     # Fake Veeam job whose session finishes immediately with $Result.
     function Set-FinishedJob {
         param([string]$Result)
-        $job = [pscustomobject]@{ Name = 'Alert-Job'; Result = $Result }
+        $job = [pscustomobject]@{ Name = 'Alert-Job'; Result = $Result; Launched = $false }
         $job | Add-Member -MemberType ScriptMethod -Name GetLastState -Value { 'Stopped' }
         $job | Add-Member -MemberType ScriptMethod -Name FindLastSession -Value {
+            # The job has no earlier session; the new one exists once Start-VBRJob ran.
+            if (-not $this.Launched) { return $null }
             [pscustomobject]@{
+                Id           = 'new-session'
                 State        = 'Stopped'
                 Result       = $this.Result
                 CreationTime = [datetime]'2019-02-17T02:00:00'
@@ -119,7 +150,7 @@ Describe 'Start-BackupJob alerting' -Tag 'Unit' {
 
     BeforeEach {
         Mock -ModuleName BackupDR Get-VBRJob { $global:BackupDRTestVeeamJob }
-        Mock -ModuleName BackupDR Start-VBRJob { }
+        Mock -ModuleName BackupDR Start-VBRJob { $global:BackupDRTestVeeamJob.Launched = $true }
         Mock -ModuleName BackupDR Start-Sleep { }
         Mock -ModuleName BackupDR Send-MailMessage { }
     }

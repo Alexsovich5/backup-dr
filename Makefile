@@ -3,15 +3,21 @@ export COMPOSE_PROJECT_NAME ?= backup-dr
 
 PESTER = pwsh -NoProfile -File build/Invoke-Tests.ps1
 
-.PHONY: build test test-unit lint demo shell clean
+.PHONY: build test test-unit lint demo shell clean compose-config
 
 build:
 	$(COMPOSE) build
 
-test:
+# Renders the compose file as Docker sees it; tests/unit/Container.Tests.ps1 checks that every
+# published port in it is bound to 127.0.0.1.
+compose-config:
+	@mkdir -p out
+	$(COMPOSE) config > out/compose.config.yml
+
+test: compose-config
 	$(COMPOSE) run --rm app $(PESTER)
 
-test-unit:
+test-unit: compose-config
 	$(COMPOSE) run --rm --no-deps app $(PESTER) -Tag Unit
 
 lint:

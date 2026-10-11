@@ -441,3 +441,61 @@ Rewrite README with honest status and generated layout
 Describe what is implemented, what is simulated and what is out of
 scope; layout reflects the tracked files.
 ```
+
+---
+
+## T18 — Security and hygiene hardening
+
+**Goal:** Review the whole repository for unsafe lookups, fail-open results, exposed services and
+hygiene problems; fix each with a failing test first.
+
+**Found and changed**
+- *Ambiguous vendor lookups (blocker).* `Start-BackupJob`, `Invoke-VeeamReplicaStep`,
+  `Invoke-AzureFailoverStep`, `Test-RetentionCompliance` and `Get-AzureReplicationStatus` took
+  `Select-Object -First 1` of `Get-VBRJob` / `Get-VBRReplica` / `Get-VBRBackup` /
+  `Get-AzureRmRecoveryServicesVault` / `Get-AzureRmRecoveryServicesAsrRecoveryPlan -Name`, which
+  treat the name as a wildcard. A wildcard or shared name could start, fail over or audit an
+  arbitrary object. New private `Resolve-ExactVendorObject` rejects wildcard names before the
+  lookup, filters to `Name` equal to the requested name (case-insensitive) and requires exactly
+  one match. The replica step also refuses restore points of more than one VM and two newest
+  points with the same time. `Get-BackupPolicy` and `Get-DRPlan` reject wildcard characters in
+  job names, replica targets, recovery plans and the ASR vault name.
+  Tests: `tests/unit/Resolve-ExactVendorObject.Tests.ps1`; new cases in `Start-BackupJob`,
+  `DRSteps`, `Test-RetentionCompliance`, `Get-BackupPolicy` and `Get-DRPlan` tests.
+- *MailHog published on every interface (major).* `docker-compose.yml` now publishes
+  `127.0.0.1:21025:8025`. `make test` / `make test-unit` render `$(COMPOSE) config` to
+  `out/compose.config.yml` (new `compose-config` target) and `tests/unit/Container.Tests.ps1`
+  fails if any published port in it or in `docker-compose.yml` lacks the 127.0.0.1 prefix. The
+  same test file fails if a Dockerfile or apt file disables signature checks
+  (`--allow-unauthenticated`, `--force-yes`, `[trusted=yes]`, `AllowUnauthenticated`,
+  `--no-check-gpg`, insecure repositories) or uses `http://`.
+- *Previous session reported as this run's result (major).* After `Start-VBRJob -RunAsync`,
+  `FindLastSession()` can still return the previous run, and only `Working` was treated as
+  running (`Starting`, `Postprocessing` ... ended the wait with result `None`, which was neither
+  alerted nor counted as a failure). `Start-BackupJob` now notes the previous session, waits for
+  a different session in state `Stopped`, and reports `Unknown` when none appears or its result
+  is not Success/Warning/Failed. `backup_scheduler.ps1` counts `Unknown` as a failure (exit 1).
+  Tests: new cases in `Start-BackupJob.Tests.ps1` and `tests/integration/BackupScheduler.Tests.ps1`.
+- *DNS read errors treated as "no record" (major).* `Invoke-DnsUpdateStep` swallowed every
+  `Get-DnsServerResourceRecord` error, so an access-denied read would add the failover address
+  next to the primary one. Only `ObjectNotFound` (what the real cmdlet reports for a name without
+  records) now counts as empty; anything else fails the step before it changes the record.
+  DnsSim raises `ObjectNotFound` like the real cmdlet. Tests: `DRSteps.Tests.ps1`,
+  `tests/sim/DnsSim.Tests.ps1`.
+- *Undelivered DR notification reported as Succeeded (minor).* `Send-BackupAlert -PassThru`
+  returns whether the relay accepted the mail; `Invoke-NotificationStep` fails when it did not.
+- *Replica failover with no session or result `None` passed (minor).* `Invoke-VeeamReplicaStep`
+  now requires a Success or Warning session result.
+- *DNS addresses not validated (minor).* `Get-DRPlan` requires dotted IPv4 `failoverIp` /
+  `primaryIp`.
+- *Audited, no change needed:* the toolkit handles no credentials (SMTP is unauthenticated, no
+  Azure login), so no secret reaches logs, exceptions or reports; the HTML report encodes every
+  value; no dated comments, fabricated claims, author tags or debug leftovers were
+  found.
+
+**Acceptance:** `make test`
+
+**Commit:**
+```
+Harden vendor lookups, job results and exposed ports
+```

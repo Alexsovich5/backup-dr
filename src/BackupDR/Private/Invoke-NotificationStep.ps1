@@ -6,7 +6,8 @@ function Invoke-NotificationStep {
         Uses the relay and sender from -Alerting (the policy's alerting block) with the
         recipient replaced by the step's 'to'. The body lists the steps that ran before
         this one (-Results). In test mode nothing is sent; the step only checks that
-        alerting settings are present. Throws when -Alerting is missing.
+        alerting settings are present. Throws when -Alerting is missing or when the mail
+        was not sent, so the run log never reports an undelivered notification as Succeeded.
     #>
     [CmdletBinding()]
     [OutputType([string])]
@@ -42,6 +43,9 @@ function Invoke-NotificationStep {
         $lines += "$($result.Name): $($result.Status) - $($result.Message)"
     }
 
-    Send-BackupAlert -Alerting $settings -Subject "DR ${Action}: $PlanName" -Body ($lines -join "`n")
+    $sent = Send-BackupAlert -Alerting $settings -Subject "DR ${Action}: $PlanName" -Body ($lines -join "`n") -PassThru
+    if (-not $sent) {
+        throw "Notification to $to was not sent (see the log for the SMTP error)"
+    }
     "Notification sent to $to"
 }

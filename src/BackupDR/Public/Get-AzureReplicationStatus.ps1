@@ -45,18 +45,18 @@ function Get-AzureReplicationStatus {
         if ([string]::IsNullOrWhiteSpace($vaultName)) {
             throw 'the DR plan has no azure.vaultName'
         }
-        $vault = @(Get-AzureRmRecoveryServicesVault -Name $vaultName) | Where-Object { $null -ne $_ } | Select-Object -First 1
-        if (-not $vault) {
-            throw "Recovery Services vault '$vaultName' not found"
+        $vault = Resolve-ExactVendorObject -Kind 'Recovery Services vault' -Name $vaultName -Lookup {
+            param($n)
+            Get-AzureRmRecoveryServicesVault -Name $n
         }
         Set-AzureRmRecoveryServicesAsrVaultContext -Vault $vault | Out-Null
 
         if ([string]::IsNullOrWhiteSpace($planName)) {
             $protected = @(Get-AzureRmRecoveryServicesAsrReplicationProtectedItem)
         } else {
-            $recoveryPlan = @(Get-AzureRmRecoveryServicesAsrRecoveryPlan -Name $planName) | Select-Object -First 1
-            if (-not $recoveryPlan) {
-                throw "ASR recovery plan '$planName' not found in vault '$vaultName'"
+            $recoveryPlan = Resolve-ExactVendorObject -Kind 'ASR recovery plan' -Name $planName -Lookup {
+                param($n)
+                Get-AzureRmRecoveryServicesAsrRecoveryPlan -Name $n
             }
             $protected = @(Get-AzureRmRecoveryServicesAsrReplicationProtectedItem -RecoveryPlan $recoveryPlan)
         }

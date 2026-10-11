@@ -14,7 +14,9 @@ function Test-RetentionCompliance {
           - otherwise the longest gap in days between consecutive scheduled weekdays
             (7 for a job that runs on one weekday).
 
-        A job without a backup is reported with the issue 'no backup found'. Any issue makes the
+        The backup is matched by the exact job name (see Resolve-ExactVendorObject): a job without
+        a backup of exactly that name is reported with the issue 'no backup found', and a name
+        that several backups share throws instead of auditing one of them. Any issue makes the
         job non-compliant. Nothing is deleted; this only reports drift.
     .EXAMPLE
         Test-RetentionCompliance -Policy (Get-BackupPolicy -Path config/backup_policy.json)
@@ -39,7 +41,10 @@ function Test-RetentionCompliance {
         $newestAge = $null
         $expired = 0
 
-        $backup = @(Get-VBRBackup -Name $name) | Where-Object { $null -ne $_ } | Select-Object -First 1
+        $backup = Resolve-ExactVendorObject -Kind 'Veeam backup' -Name $name -AllowMissing -Lookup {
+            param($n)
+            Get-VBRBackup -Name $n
+        }
         if ($null -eq $backup) {
             $issues.Add("no backup found for job '$name'")
         } else {

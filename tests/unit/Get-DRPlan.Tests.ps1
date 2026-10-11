@@ -75,6 +75,33 @@ Describe 'Get-DRPlan' -Tag 'Unit' {
             Get-ValidationMessage $path | Should -Match "step 'Notify IT': notification requires 'to'"
         }
 
+        It 'rejects wildcard characters in <Field>' -TestCases @(
+            @{ Field = 'target'; Index = 0; Label = 'Fail over DB replica' }
+            @{ Field = 'recoveryPlan'; Index = 1; Label = 'Fail over app tier to Azure' }
+        ) {
+            param($Field, $Index, $Label)
+            $path = Write-PlanFile { param($p) $p.failoverSteps[$Index].$Field = 'prod-*' }.GetNewClosure()
+            Get-ValidationMessage $path | Should -Match "step '$Label': '$Field' must be an exact name without wildcard characters"
+        }
+
+        It 'rejects wildcard characters in azure.<Field>' -TestCases @(
+            @{ Field = 'vaultName' }, @{ Field = 'recoveryPlan' }
+        ) {
+            param($Field)
+            $path = Write-PlanFile { param($p) $p.azure.$Field = 'rsv-[ab]' }.GetNewClosure()
+            Get-ValidationMessage $path | Should -Match "azure.${Field} must be an exact name without wildcard characters"
+        }
+
+        It 'rejects a dns_update <Field> that is not an IPv4 address' -TestCases @(
+            @{ Field = 'failoverIp'; Value = '10.20.0' }
+            @{ Field = 'primaryIp'; Value = 'app.example.local' }
+            @{ Field = 'failoverIp'; Value = '::1' }
+        ) {
+            param($Field, $Value)
+            $path = Write-PlanFile { param($p) $p.failoverSteps[2].$Field = $Value }.GetNewClosure()
+            Get-ValidationMessage $path | Should -Match "step 'Point app DNS at DR': $Field '.*' is not an IPv4 address"
+        }
+
         It 'rejects duplicate step names' {
             $path = Write-PlanFile { param($p) $p.failoverSteps[1].name = $p.failoverSteps[0].name }
             Get-ValidationMessage $path | Should -Match "duplicate step name 'Fail over DB replica'"

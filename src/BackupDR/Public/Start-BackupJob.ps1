@@ -3,17 +3,24 @@ function Start-BackupJob {
     .SYNOPSIS
         Starts the Veeam job for a policy entry and waits for its session to finish.
     .DESCRIPTION
-        Looks the job up with Get-VBRJob, refuses to start it when it is already Working,
-        starts it with Start-VBRJob -RunAsync (-FullBackup for a 'full' policy job) and then
-        checks FindLastSession().State. The first check happens straight after the start, so
-        a session that has already finished costs no sleep. While the session is Working the
-        function sleeps -PollSeconds and checks again, at most
-        ceil(timeoutHours * 3600 / max(PollSeconds, 1)) times; when that budget is used up the
-        result is 'Timeout'.
+        Looks the job up with Get-VBRJob by its exact policy name: a name with wildcard
+        characters, or one that two Veeam jobs share, is an Error and nothing is started; a
+        lookup that returns only other names (for example prefix matches) is NotFound.
+        Refuses to start a job that is already Working, notes the job's last session, starts it
+        with Start-VBRJob -RunAsync (-FullBackup for a 'full' policy job) and then checks
+        FindLastSession(). The first check happens straight after the start, so a session that
+        has already finished costs no sleep. Until a session other than the one noted before
+        the start exists and has reached the Stopped state, the function sleeps -PollSeconds
+        and checks again, at most ceil(timeoutHours * 3600 / max(PollSeconds, 1)) times.
+
+        Result is the new session's result when it is Success, Warning or Failed; 'Timeout'
+        when the new session is still running after the budget; 'Unknown' when no new session
+        appeared or it stopped with any other result (such as None). The previous run's result
+        is never reported as this run's.
 
         Returns an object with JobName, Outcome (Started, NotFound, AlreadyRunning, DryRun or
-        Error), Result (the session result, or 'Timeout'), Duration (session EndTime minus
-        CreationTime when both are known) and Message.
+        Error), Result, Duration (session EndTime minus CreationTime when both are known) and
+        Message.
     .PARAMETER PollSeconds
         Seconds between session checks. Defaults to $env:BACKUPDR_POLL_SECONDS, else 60.
         0 is allowed (no wait between checks; the number of checks stays bounded).
@@ -57,7 +64,10 @@ function Start-BackupJob {
     }
 
     try {
-        $veeamJob = Get-VBRJob -Name $jobName | Select-Object -First 1
+        $veeamJob = Resolve-ExactVendorObject -Kind 'Veeam job' -Name $jobName -AllowMissing -Lookup {
+            param($n)
+            Get-VBRJob -Name $n
+        }
         if (-not $veeamJob) {
             $outcome.Outcome = 'NotFound'
             $outcome.Message = "Job not found: $jobName"
@@ -79,6 +89,9 @@ function Start-BackupJob {
             return $outcome
         }
 
+        # The session of the previous run, so it is not mistaken for this run's session.
+        $previous = $veeamJob.FindLastSession()
+
         Write-BackupLog -Message "Starting backup job: $jobName"
         $startParams = @{ Job = $veeamJob; RunAsync = $true }
         if ([string]$Job.type -eq 'full') {
@@ -90,20 +103,36 @@ function Start-BackupJob {
         $timeoutSeconds = [double]$Job.timeoutHours * 3600
         $maxPolls = [int][math]::Ceiling($timeoutSeconds / [math]::Max($PollSeconds, 1))
 
+        $isNewSession = {
+            param($Candidate)
+            if ($null -eq $Candidate) { return $false }
+            if ($null -eq $previous) { return $true }
+            $candidateId = [string]$Candidate.Id
+            $previousId = [string]$previous.Id
+            if ($candidateId -or $previousId) { return $candidateId -ne $previousId }
+            [string]$Candidate.CreationTime -ne [string]$previous.CreationTime
+        }
+
         $session = $veeamJob.FindLastSession()
-        for ($i = 0; $i -lt $maxPolls -and $session -and $session.State -eq 'Working'; $i++) {
+        for ($i = 0; $i -lt $maxPolls -and -not ((& $isNewSession $session) -and $session.State -eq 'Stopped'); $i++) {
             Start-Sleep -Seconds $PollSeconds
             $session = $veeamJob.FindLastSession()
         }
 
-        if (-not $session) {
+        $finalResults = @('Success', 'Warning', 'Failed')
+        if (-not (& $isNewSession $session)) {
             $outcome.Result = 'Unknown'
-            $outcome.Message = "No session found for $jobName after start"
-            Write-BackupLog -Level 'WARN' -Message $outcome.Message
+            $outcome.Message = "Job $jobName was started but no new session appeared within $($Job.timeoutHours) h ($maxPolls checks)"
+            Write-BackupLog -Level 'ERROR' -Message $outcome.Message
         }
-        elseif ($session.State -eq 'Working') {
+        elseif ($session.State -ne 'Stopped') {
             $outcome.Result = 'Timeout'
-            $outcome.Message = "Job $jobName still running after $($Job.timeoutHours) h ($maxPolls checks)"
+            $outcome.Message = "Job $jobName still $($session.State) after $($Job.timeoutHours) h ($maxPolls checks)"
+            Write-BackupLog -Level 'ERROR' -Message $outcome.Message
+        }
+        elseif ($finalResults -notcontains [string]$session.Result) {
+            $outcome.Result = 'Unknown'
+            $outcome.Message = "Job $jobName stopped with result '$($session.Result)', not Success, Warning or Failed"
             Write-BackupLog -Level 'ERROR' -Message $outcome.Message
         }
         else {

@@ -7,10 +7,14 @@ function Send-BackupAlert {
         default 25) from -Alerting and calls Send-MailMessage. A missing recipient, sender or
         relay is logged as a warning and nothing is sent. SMTP errors are logged at ERROR
         level and not rethrown, so a broken relay never stops a backup run.
+    .PARAMETER PassThru
+        Return $true when the relay accepted the message and $false when nothing was sent,
+        for callers that must know whether the mail went out.
     .EXAMPLE
         Send-BackupAlert -Alerting $policy.alerting -Subject 'Backup FAILED: Job-A' -Body 'Status: Failed'
     #>
     [CmdletBinding()]
+    [OutputType([bool])]
     param(
         [Parameter(Mandatory = $true)]
         [psobject]$Alerting,
@@ -22,7 +26,9 @@ function Send-BackupAlert {
         [AllowEmptyString()]
         [string]$Body,
 
-        [switch]$BodyAsHtml
+        [switch]$BodyAsHtml,
+
+        [switch]$PassThru
     )
 
     $to = @($Alerting.email | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | ForEach-Object { [string]$_ })
@@ -35,6 +41,7 @@ function Send-BackupAlert {
     if ([string]::IsNullOrWhiteSpace($server)) { $missing += 'relay (smtpServer)' }
     if ($missing.Count -gt 0) {
         Write-BackupLog -Level 'WARN' -Message "Alert '$Subject' not sent: no $($missing -join ', ') in alerting settings"
+        if ($PassThru) { return $false }
         return
     }
 
@@ -56,11 +63,14 @@ function Send-BackupAlert {
         $mailParams['BodyAsHtml'] = $true
     }
 
+    $sent = $false
     try {
         Send-MailMessage @mailParams
+        $sent = $true
         Write-BackupLog -Message "Alert sent to $($to -join ', '): $Subject"
     }
     catch {
         Write-BackupLog -Level 'ERROR' -Message "Alert '$Subject' could not be sent via ${server}:${port}: $($_.Exception.Message)"
     }
+    if ($PassThru) { $sent }
 }

@@ -9,7 +9,8 @@
     every job's last result to -ReportPath and, when alerting.dailyReport is true, mails it.
 
     Exit code: 0 when every job that ran succeeded (or was skipped), 1 when any job ended with
-    an error, was not found, failed or timed out, or when the policy cannot be loaded.
+    an error, was not found, failed, timed out or ended with an unknown result, or when the
+    policy cannot be loaded.
 
     The vendor commands come from BACKUPDR_PROVIDER (veeam, simulator or none).
 .PARAMETER ConfigPath
@@ -90,7 +91,7 @@ foreach ($job in @($policy.jobs)) {
 }
 
 $failed = @($results | Where-Object {
-        @('Error', 'NotFound') -contains $_.Outcome -or @('Failed', 'Timeout') -contains $_.Result
+        @('Error', 'NotFound') -contains $_.Outcome -or @('Failed', 'Timeout', 'Unknown') -contains $_.Result
     })
 
 # Post-backup verification of the jobs marked verifyAfterBackup.

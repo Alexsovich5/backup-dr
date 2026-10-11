@@ -151,7 +151,8 @@ Compatibility rule: all code under `src/`, `scripts/` and `sim/` uses only Power
   "health": { "repositoryMinFreePercent": 15 }
 }
 ```
-Validation: `name` unique & non-empty; `type` in {incremental, full}; `schedule` values in
+Validation: `name` unique, non-empty and without wildcard characters (`* ? [ ]`; it is matched
+exactly against the Veeam job name); `type` in {incremental, full}; `schedule` values in
 weekday names or `Daily`; `timeoutHours` > 0; `retentionDays` >= 1; `intervalMinutes` optional
 >= 15. `alerting.smtpServer`/`smtpPort` may be overridden by `BACKUPDR_SMTP_SERVER`/`_PORT`.
 
@@ -173,13 +174,25 @@ weekday names or `Daily`; `timeoutHours` > 0; `retentionDays` >= 1; `intervalMin
 ```
 The `azure_failover` step has no `direction` field: the action decides it (failover →
 unplanned failover `PrimaryToRecovery`; failback → planned failover `RecoveryToPrimary`, see §5.5).
+`veeam_replica.target`, `azure_failover.recoveryPlan`, `azure.vaultName` and `azure.recoveryPlan`
+must not contain wildcard characters; `dns_update.failoverIp`/`primaryIp` must be dotted IPv4
+addresses.
+
+**Exact vendor lookups.** The Veeam and AzureRM `Get-*` cmdlets treat `-Name` as a wildcard
+pattern. Every lookup that precedes a start, failover, failback or audit (`Get-VBRJob`,
+`Get-VBRReplica`, `Get-VBRBackup`, `Get-AzureRmRecoveryServicesVault`,
+`Get-AzureRmRecoveryServicesAsrRecoveryPlan`) goes through the private
+`Resolve-ExactVendorObject`: names with wildcard characters are refused before the lookup, results
+are filtered to `Name` equal to the requested name (case-insensitive), and exactly one must remain
+(0 → not found, >1 → error, nothing changed). A replica's restore points must all belong to one
+VM and the newest must be unique, otherwise the step fails before any failover or failback.
 
 ### 5.3 Public functions (module `BackupDR`)
 | Function | Signature | Returns |
 |---|---|---|
 | `Get-BackupPolicy` | `-Path <string>` | validated policy object; throws `PolicyValidationException`-style error listing all problems |
 | `Test-BackupJobDue` | `-Job <psobject> -Now <datetime> [-LastRun <datetime>]` | `[bool]`. If `LastRun` > `Now` (clock skew or seeded future session) an interval job is **not due** and a WARN is logged. |
-| `Start-BackupJob` | `-Job <psobject> [-DryRun] [-PollSeconds <int>] [-Alerting <psobject>]` | `[pscustomobject]@{JobName; Outcome = Started/Skipped/NotFound/AlreadyRunning/DryRun/Error; Result; Duration; Message}` (`Message` carries the log text, e.g. the exception message for `Error`). `-PollSeconds` defaults to `$env:BACKUPDR_POLL_SECONDS`, else 60; `0` is allowed. After `Start-VBRJob` it checks the session state **before** the first sleep (no sleep when already finished), then polls at most `maxPolls = ceil(timeoutHours*3600 / max(PollSeconds,1))` times; when the budget is exhausted `Result='Timeout'`. No Stopwatch. |
+| `Start-BackupJob` | `-Job <psobject> [-DryRun] [-PollSeconds <int>] [-Alerting <psobject>]` | `[pscustomobject]@{JobName; Outcome = Started/Skipped/NotFound/AlreadyRunning/DryRun/Error; Result; Duration; Message}` (`Message` carries the log text, e.g. the exception message for `Error`). `-PollSeconds` defaults to `$env:BACKUPDR_POLL_SECONDS`, else 60; `0` is allowed. The job is looked up by exact name (wildcard name or two matching jobs → `Error`, nothing started). The last session is noted before `Start-VBRJob`; after the start it checks the session **before** the first sleep (no sleep when already finished), then polls at most `maxPolls = ceil(timeoutHours*3600 / max(PollSeconds,1))` times until a session other than the noted one is `Stopped`. New session still running when the budget is exhausted → `Result='Timeout'`; no new session, or one that stopped with a result other than Success/Warning/Failed → `Result='Unknown'` (alerted and counted as a failure by the scheduler). No Stopwatch. |
 | `Get-BackupJobReport` | `-JobName <string[]>` or `-Policy <psobject>` (selects only jobs with `verifyAfterBackup: true`) | objects `{JobName, Status, StartTime, EndTime, DataSize, DedupRatio}`; newest session by `CreationTime`; `Status='NoSession'` when a job has none |
 | `ConvertTo-BackupReportHtml` | `-Report <object[]> -Title <string>` | HTML string |
 | `Test-RetentionCompliance` | `-Policy <psobject> [-Now <datetime>]` | objects `{JobName, OldestPointAge, ExpiredPoints, NewestPointAge, Compliant, Issues[]}` |
@@ -187,7 +200,7 @@ unplanned failover `PrimaryToRecovery`; failback → planned failover `RecoveryT
 | `Get-AzureReplicationStatus` | `-Plan <psobject> [-Now <datetime>]` | `{State; ExitCode; Items[{Name, Health, RpoMinutes, Ok}]}` |
 | `Get-DRPlan` | `-Path <string>` | validated plan |
 | `Invoke-DRPlan` | `-Plan <psobject> -Action failover|failback|test [-Alerting] [-RunLogPath] [-Now]` | `{Action; Success; Steps[{Name, Type, Status, Message, Started, Finished}]}` |
-| `Send-BackupAlert` | `-Alerting <psobject> -Subject <string> -Body <string> [-BodyAsHtml]` | nothing; wraps `Send-MailMessage` |
+| `Send-BackupAlert` | `-Alerting <psobject> -Subject <string> -Body <string> [-BodyAsHtml] [-PassThru]` | nothing, or with `-PassThru` `$true`/`$false` for sent/not sent; wraps `Send-MailMessage`. The DR notification step uses `-PassThru` and fails when the mail was not sent. |
 | `Set-BackupLogPath` | `-Path <string>` | nothing; sets `$script:LogPath` and creates the parent directory; default `logs/backupdr.log` under the repo |
 | `Write-BackupLog` (private) | `-Message -Level INFO/WARN/ERROR` | writes to host + `$script:LogPath` |
 
@@ -224,7 +237,9 @@ state files; `BACKUPDR_SIM_NOW` = simulator clock (§4); `BACKUPDR_POLL_SECONDS`
 - Windows `DnsServer` module: `Get-DnsServerZone -Name` (pre-flight),
   `Add-DnsServerResourceRecordA -ZoneName -Name -IPv4Address`,
   `Remove-DnsServerResourceRecord -ZoneName -Name -RRType A -Force`,
-  `Get-DnsServerResourceRecord -ZoneName -Name`.
+  `Get-DnsServerResourceRecord -ZoneName -Name` (a name without records is an `ObjectNotFound`
+  error and counts as "no address yet"; any other read error stops the DNS step before it
+  changes the record).
 - Windows PowerShell host: `Add-PSSnapin -Name VeeamPSSnapin` (provider `veeam` only). It does
   not exist in PowerShell Core, so VendorStubs defines it for unit tests.
 
@@ -305,7 +320,10 @@ are committed in T1.
   no threshold gate). Before `Integration`-tagged tests run, it waits for MailHog by retrying
   `Invoke-RestMethod http://mailhog:8025/api/v2/messages` for up to ~10 s.
 - **`make test`** = `$(COMPOSE) run --rm app pwsh -File build/Invoke-Tests.ps1`
-  (compose starts MailHog via `depends_on`). `make test-unit` and `make lint` use
+  (compose starts MailHog via `depends_on`). `make test` and `make test-unit` first write
+  `$(COMPOSE) config` to `out/compose.config.yml`; `tests/unit/Container.Tests.ps1` fails if any
+  published port in it or in `docker-compose.yml` is not bound to `127.0.0.1`, or if a
+  Dockerfile/apt file disables signature checks or uses `http://`. `make test-unit` and `make lint` use
   `$(COMPOSE) run --rm --no-deps app ...`, so MailHog is not started.
 - **Unit (`tests/unit/*.Tests.ps1`, tag `Unit`)**: every public function. Each file sets
   `$env:BACKUPDR_PROVIDER = 'none'` before `Import-Module src/BackupDR -Force`, so the simulators

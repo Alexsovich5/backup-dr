@@ -40,7 +40,7 @@ console.
 
 | Script | 0 | 1 | 2 |
 |---|---|---|---|
-| `scripts/backup_scheduler.ps1` | every job that ran succeeded, or nothing was due | a job ended Failed or Timeout, was not found, raised an error, or the policy could not be loaded | — |
+| `scripts/backup_scheduler.ps1` | every job that ran succeeded, or nothing was due | a job ended Failed, Timeout or Unknown, was not found, raised an error, or the policy could not be loaded | — |
 | `scripts/health_check.ps1` | OK | WARNING | CRITICAL (also when the policy cannot be loaded) |
 | `scripts/azure_replication.ps1` | OK | WARNING | CRITICAL (also when the DR plan cannot be loaded) |
 | `scripts/disaster_recovery.ps1` | the plan succeeded | a step failed, the plan or policy could not be loaded, or the action was not confirmed | — |
@@ -63,11 +63,13 @@ What it does, in order:
 2. For each job, decides whether it is due at `-Now`: the weekday must be in `schedule` (or the
    schedule is `Daily`), and for jobs with `intervalMinutes` at least that many minutes must
    have passed since the job's newest session. A job that is not due is logged as `Skipping`.
-3. Starts each due job unless it does not exist (`NotFound`) or is already running
-   (`AlreadyRunning`), then polls its session every `-PollSeconds` until it finishes or
-   `timeoutHours` passes (`Timeout`).
-4. Sends an alert mail for a Failed result (`alerting.alertOnFailure`) or a Warning result
-   (`alerting.alertOnWarning`).
+3. Starts each due job unless it does not exist (`NotFound`; the policy name must match the
+   Veeam job name exactly, without wildcards) or is already running (`AlreadyRunning`), then
+   polls every `-PollSeconds` until the new session has stopped or `timeoutHours` passes
+   (`Timeout`). No new session, or one that stopped without a Success, Warning or Failed
+   result, is reported as `Unknown`.
+4. Sends an alert mail for a Failed, Timeout or Unknown result (`alerting.alertOnFailure`) or a
+   Warning result (`alerting.alertOnWarning`).
 5. Verifies the jobs with `verifyAfterBackup: true` from their latest session; a status other
    than Success is logged as WARN.
 6. Writes the HTML daily report to `-ReportPath` and mails it when `alerting.dailyReport` is
@@ -233,7 +235,10 @@ copy of the run log with the incident record.
    - `pwsh scripts/disaster_recovery.ps1 -Action test` changes nothing and shows the replica's
      current state and the recovery plan's current site, which helps confirm where each
      component stands.
-3. Exit code 0 means every step succeeded and the notification was sent.
+3. Exit code 0 means every step without `continueOnError` succeeded. The sample plan's
+   notification step has `continueOnError`, so a mail the relay did not accept shows as
+   `Failed` on the `Notify IT` line (and in the run log) without changing the exit code;
+   inform people by other means in that case.
 
 ### 6.3 Verification after failover
 

@@ -21,9 +21,16 @@ PowerShell Core 6.1.2, Pester 4, Veeam 9.5 and AzureRM 6.x cmdlet surfaces).
   tests in `tests/unit/Get-BackupPolicy.Tests.ps1`.
 - Schedule evaluation for weekday/`Daily` jobs and `intervalMinutes` sub-daily jobs —
   `Test-BackupJobDue.ps1`; `tests/unit/Test-BackupJobDue.Tests.ps1`.
-- Job execution that skips missing and already-running jobs, polls the session until it
-  finishes or `timeoutHours` passes, and supports `-DryRun` — `Start-BackupJob.ps1`;
-  `tests/unit/Start-BackupJob.Tests.ps1`.
+- Job execution that skips missing and already-running jobs, polls until the new session (not
+  the previous run's) has stopped or `timeoutHours` passes, reports a missing session or an
+  unrecognised result as `Unknown` (alerted, scheduler exits 1), and supports `-DryRun` —
+  `Start-BackupJob.ps1`; `tests/unit/Start-BackupJob.Tests.ps1`.
+- Exact-name lookups of Veeam jobs, backups and replicas and of ASR vaults and recovery plans:
+  wildcard names are refused, prefix matches are ignored and a name matching more than one
+  object is an error, so a job start, failover or audit never acts on the wrong object —
+  `Private/Resolve-ExactVendorObject.ps1`; `tests/unit/Resolve-ExactVendorObject.Tests.ps1`,
+  `tests/unit/Start-BackupJob.Tests.ps1`, `tests/unit/DRSteps.Tests.ps1`,
+  `tests/unit/Test-RetentionCompliance.Tests.ps1`.
 - Post-backup verification (status, times, data size, dedup ratio) and an HTML daily report —
   `Get-BackupJobReport.ps1`, `ConvertTo-BackupReportHtml.ps1`;
   `tests/unit/Get-BackupJobReport.Tests.ps1`, `tests/unit/ConvertTo-BackupReportHtml.Tests.ps1`.
@@ -44,12 +51,17 @@ PowerShell Core 6.1.2, Pester 4, Veeam 9.5 and AzureRM 6.x cmdlet surfaces).
   `tests/unit/Get-DRPlan.Tests.ps1`.
 - DR execution: failover in order, failback of reversible steps in reverse order, and a
   pre-flight `test` that changes nothing; stops on the first failed step unless
-  `continueOnError` is set; writes a JSON run log — `Invoke-DRPlan.ps1`, `Private/Invoke-*Step.ps1`,
+  `continueOnError` is set; a notification that could not be mailed and a DNS record that cannot
+  be read fail their step instead of passing silently; writes a JSON run log —
+  `Invoke-DRPlan.ps1`, `Private/Invoke-*Step.ps1`,
   `scripts/disaster_recovery.ps1`; `tests/unit/Invoke-DRPlan.Tests.ps1`,
   `tests/unit/DRSteps.Tests.ps1`, `tests/integration/DisasterRecovery.Tests.ps1`.
 - Logging to console and a configurable log file — `Private/Write-BackupLog.ps1`,
   `Set-BackupLogPath.ps1`; `tests/unit/Write-BackupLog.Tests.ps1`.
 - Simulators for the vendor cmdlets, with state in JSON files — `sim/`; `tests/sim/`.
+- Container checks: every port published by `docker-compose.yml` (as written and as rendered by
+  `docker compose config`) is bound to 127.0.0.1, and no Dockerfile turns off apt signature
+  checks — `tests/unit/Container.Tests.ps1`.
 - Operations runbook — `docs/runbook.md`; `tests/unit/Docs.Tests.ps1` checks the files it names.
 
 Function files above are under `src/BackupDR/Public/` unless a path is given.
@@ -73,6 +85,12 @@ Function files above are under `src/BackupDR/Public/` unless a path is given.
   mocked sessions in unit tests.
 - Alert e-mail uses unauthenticated SMTP without TLS. Only SMTP runs against a real server
   (MailHog in a container).
+- MailHog is lab software without authentication; its web UI/API is published on
+  127.0.0.1:21025 only and its SMTP port is reachable only inside the compose network.
+- A `veeam_replica` step fails over one VM: a replica whose restore points belong to more than
+  one VM is refused rather than failing over an arbitrary one.
+- Pester and PSScriptAnalyzer are installed from the PowerShell Gallery pinned by version, not
+  by file hash.
 - No RPO/RTO or backup success-rate figures are claimed; the RPO check is a configurable
   threshold in `config/dr_plan.json`.
 
@@ -157,6 +175,7 @@ src/
       Invoke-DnsUpdateStep.ps1
       Invoke-NotificationStep.ps1
       Invoke-VeeamReplicaStep.ps1
+      Resolve-ExactVendorObject.ps1
       Test-PolicyNumber.ps1
       Write-BackupLog.ps1
     Public/
@@ -192,6 +211,7 @@ tests/
     VeeamSim.Tests.ps1
   unit/
     Compatibility.Tests.ps1
+    Container.Tests.ps1
     ConvertTo-BackupReportHtml.Tests.ps1
     DRSteps.Tests.ps1
     Docs.Tests.ps1
@@ -203,6 +223,7 @@ tests/
     Harness.Tests.ps1
     Import-BackupDRProvider.Tests.ps1
     Invoke-DRPlan.Tests.ps1
+    Resolve-ExactVendorObject.Tests.ps1
     Send-BackupAlert.Tests.ps1
     Start-BackupJob.Tests.ps1
     Test-BackupJobDue.Tests.ps1
