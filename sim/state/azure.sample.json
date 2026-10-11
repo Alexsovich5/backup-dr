@@ -1,0 +1,36 @@
+{
+  "subscriptionId": "00000000-0000-0000-0000-000000000000",
+  "vaults": [
+    { "name": "rsv-dr", "resourceGroupName": "rg-dr", "location": "westeurope" }
+  ],
+  "recoveryPlans": [
+    {
+      "name": "rp-primary",
+      "vaultName": "rsv-dr",
+      "currentSite": "Primary",
+      "primaryFabric": "primary-vcenter",
+      "recoveryFabric": "Microsoft Azure"
+    }
+  ],
+  "protectedItems": [
+    {
+      "name": "prod-web-01",
+      "vaultName": "rsv-dr",
+      "recoveryPlan": "rp-primary",
+      "protectionState": "Protected",
+      "replicationHealth": "Normal",
+      "rpoInSeconds": 240,
+      "lastRpoCalculatedTime": "-2m"
+    },
+    {
+      "name": "prod-app-01",
+      "vaultName": "rsv-dr",
+      "recoveryPlan": "rp-primary",
+      "protectionState": "Protected",
+      "replicationHealth": "Normal",
+      "rpoInSeconds": 300,
+      "lastRpoCalculatedTime": "-2m"
+    }
+  ],
+  "jobs": []
+}

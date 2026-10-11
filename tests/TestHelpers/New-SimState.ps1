@@ -3,7 +3,7 @@ function New-SimState {
     .SYNOPSIS
         Seeds simulator state files for a test run.
     .DESCRIPTION
-        Copies every sim/state/<name>.sample.json to <Path>/<name>.json, rewrites each
+        Copies every sim/state/<name>.sample.json (veeam, azure, dns) to <Path>/<name>.json, rewrites each
         relative offset string such as "-26h" or "+1d" to Anchor + offset in ISO 8601
         (yyyy-MM-ddTHH:mm:ss), and points $env:BACKUPDR_SIM_STATE at Path.
         Returns the state directory.

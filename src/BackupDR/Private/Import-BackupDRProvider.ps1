@@ -3,7 +3,9 @@ function Import-BackupDRProvider {
     .SYNOPSIS
         Loads the commands behind the vendor cmdlet names used by BackupDR.
     .DESCRIPTION
-        veeam      Add-PSSnapin VeeamPSSnapin (Windows with the Veeam console installed).
+        veeam      Add-PSSnapin VeeamPSSnapin (Windows with the Veeam console installed), then
+                   Import-Module AzureRM.RecoveryServices, AzureRM.RecoveryServices.SiteRecovery
+                   and DnsServer (RSAT DNS Server tools) globally.
         simulator  Import every simulator module under sim/ (sim/<Name>/<Name>.psd1) globally.
         none       Load nothing; unit tests provide stubs and mocks.
         The provider comes from -Provider, else $env:BACKUPDR_PROVIDER, else veeam on
@@ -27,6 +29,13 @@ function Import-BackupDRProvider {
                 Add-PSSnapin -Name VeeamPSSnapin -ErrorAction Stop
             } catch {
                 throw 'Veeam PowerShell snap-in (VeeamPSSnapin) not found; install the Veeam console or set BACKUPDR_PROVIDER=simulator'
+            }
+            foreach ($moduleName in @('AzureRM.RecoveryServices', 'AzureRM.RecoveryServices.SiteRecovery', 'DnsServer')) {
+                try {
+                    Import-Module -Name $moduleName -Global -ErrorAction Stop
+                } catch {
+                    throw "PowerShell module '$moduleName' not found; install it on the Veeam server or set BACKUPDR_PROVIDER=simulator"
+                }
             }
         }
         'simulator' {

@@ -4,8 +4,8 @@ Import-Module (Join-Path $PSScriptRoot '../../src/BackupDR') -Force
 
 Describe 'Import-BackupDRProvider' -Tag 'Unit' {
     AfterAll {
-        Remove-Module VeeamSim -Force -ErrorAction SilentlyContinue
-        # VeeamSim shadowed the global stubs while it was loaded; restore them.
+        Remove-Module VeeamSim, AzureSim, DnsSim -Force -ErrorAction SilentlyContinue
+        # The simulators shadowed the global stubs while it was loaded; restore them.
         . (Join-Path $PSScriptRoot '../TestHelpers/VendorStubs.ps1')
         $env:BACKUPDR_PROVIDER = 'none'
     }
@@ -48,13 +48,44 @@ Describe 'Import-BackupDRProvider' -Tag 'Unit' {
             Get-Module VeeamSim | Should -Not -BeNullOrEmpty
             Assert-MockCalled -ModuleName BackupDR Add-PSSnapin -Times 0 -Exactly
         }
+
+        It 'makes the AzureSim and DnsSim commands available for simulator' {
+            Mock -ModuleName BackupDR Add-PSSnapin {}
+            Remove-Module AzureSim, DnsSim -Force -ErrorAction SilentlyContinue
+            InModuleScope BackupDR {
+                Import-BackupDRProvider -Provider 'simulator'
+                (Get-Command Start-AzureRmRecoveryServicesAsrUnplannedFailoverJob).ModuleName | Should -Be 'AzureSim'
+                (Get-Command Get-AzureRmRecoveryServicesAsrReplicationProtectedItem).ModuleName | Should -Be 'AzureSim'
+                (Get-Command Get-DnsServerZone).ModuleName | Should -Be 'DnsSim'
+                (Get-Command Add-DnsServerResourceRecordA).ModuleName | Should -Be 'DnsSim'
+            }
+        }
     }
 
     Context 'veeam' {
         It 'adds the VeeamPSSnapin snap-in for veeam' {
             Mock -ModuleName BackupDR Add-PSSnapin {}
+            Mock -ModuleName BackupDR Import-Module {} -ParameterFilter { $Name -like 'AzureRM*' -or $Name -eq 'DnsServer' }
             InModuleScope BackupDR { Import-BackupDRProvider -Provider 'veeam' }
             Assert-MockCalled -ModuleName BackupDR Add-PSSnapin -Times 1 -Exactly -ParameterFilter { $Name -eq 'VeeamPSSnapin' }
+        }
+
+        It 'imports the AzureRM Site Recovery and DnsServer modules for veeam' {
+            Mock -ModuleName BackupDR Add-PSSnapin {}
+            Mock -ModuleName BackupDR Import-Module {} -ParameterFilter { $Name -like 'AzureRM*' -or $Name -eq 'DnsServer' }
+            InModuleScope BackupDR { Import-BackupDRProvider -Provider 'veeam' }
+            Assert-MockCalled -ModuleName BackupDR Import-Module -Times 1 -Exactly -Scope It -ParameterFilter { $Name -eq 'AzureRM.RecoveryServices' }
+            Assert-MockCalled -ModuleName BackupDR Import-Module -Times 1 -Exactly -Scope It -ParameterFilter { $Name -eq 'AzureRM.RecoveryServices.SiteRecovery' }
+            Assert-MockCalled -ModuleName BackupDR Import-Module -Times 1 -Exactly -Scope It -ParameterFilter { $Name -eq 'DnsServer' }
+        }
+
+        It 'names the module that cannot be imported for veeam' {
+            Mock -ModuleName BackupDR Add-PSSnapin {}
+            Mock -ModuleName BackupDR Import-Module {} -ParameterFilter { $Name -like 'AzureRM*' }
+            Mock -ModuleName BackupDR Import-Module { throw "The specified module 'DnsServer' was not loaded." } -ParameterFilter { $Name -eq 'DnsServer' }
+            InModuleScope BackupDR {
+                { Import-BackupDRProvider -Provider 'veeam' } | Should -Throw "PowerShell module 'DnsServer' not found"
+            }
         }
 
         It 'names the snap-in when it cannot be loaded' {

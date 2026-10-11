@@ -1,0 +1,12 @@
+{
+  "zones": [
+    {
+      "name": "example.local",
+      "zoneType": "Primary",
+      "isDsIntegrated": true,
+      "records": [
+        { "hostName": "app", "recordType": "A", "ipv4Address": "10.10.0.10", "timeToLive": "01:00:00" }
+      ]
+    }
+  ]
+}

@@ -280,10 +280,10 @@ each step has the fields its type requires.
 **Goal:** Simulated AzureRM ASR and Windows DNS cmdlets for DR steps and replication checks.
 
 **Files**
-- create `sim/AzureSim/AzureSim.psm1`, `.psd1` (cmdlets in SPEC §5.5: `Start-AzureRmRecoveryServicesAsrUnplannedFailoverJob` accepts only `-Direction PrimaryToRecovery` and flips the recovery plan `CurrentSite` to recovery; `Start-AzureRmRecoveryServicesAsrPlannedFailoverJob` accepts only `-Direction RecoveryToPrimary` (failback) and flips it back, throwing for `PrimaryToRecovery` as real ASR does for VMware-to-Azure; jobs complete immediately, stamped with the simulator clock)
+- create `sim/AzureSim/AzureSim.psm1`, `.psd1` (cmdlets in SPEC §5.5: `Start-AzureRmRecoveryServicesAsrUnplannedFailoverJob` accepts only `-Direction PrimaryToRecovery` and flips the recovery plan `CurrentSite` to recovery; `Start-AzureRmRecoveryServicesAsrPlannedFailoverJob` accepts only `-Direction RecoveryToPrimary` (failback) and flips it back, throwing for `PrimaryToRecovery` as real ASR does for VMware-to-Azure; jobs complete immediately, stamped with the simulator clock; as with real ASR, every ASR cmdlet except `Get-AzureRmRecoveryServicesVault` throws until `Set-AzureRmRecoveryServicesAsrVaultContext -Vault` has been called)
 - create `sim/DnsSim/DnsSim.psm1`, `.psd1` (`Get-DnsServerZone -Name` (throws when the zone is absent, like the real cmdlet), `Add-DnsServerResourceRecordA`, `Remove-DnsServerResourceRecord`, `Get-DnsServerResourceRecord`)
 - create `sim/state/azure.sample.json`, `sim/state/dns.sample.json` (zone `example.local`, record `app` → `10.10.0.10`)
-- modify `src/BackupDR/Private/Import-BackupDRProvider.ps1` (`veeam`: also `Import-Module AzureRM.RecoveryServices.SiteRecovery`, `DnsServer`; `simulator`: load the new sims)
+- modify `src/BackupDR/Private/Import-BackupDRProvider.ps1` (`veeam`: also `Import-Module AzureRM.RecoveryServices` (home of `Get-AzureRmRecoveryServicesVault`), `AzureRM.RecoveryServices.SiteRecovery`, `DnsServer`; `simulator`: load the new sims)
 - modify `tests/TestHelpers/VendorStubs.ps1` (AzureRM ASR stubs incl. both failover cmdlets, `Get-DnsServerZone` and the DNS record stubs, `Import-Module` is not stubbed — provider tests mock it with `-ModuleName BackupDR -ParameterFilter { $Name -like 'AzureRM*' -or $Name -eq 'DnsServer' }`)
 - modify `tests/TestHelpers/New-SimState.ps1` (copy and anchor azure/dns samples)
 - modify `tests/unit/Import-BackupDRProvider.Tests.ps1`
