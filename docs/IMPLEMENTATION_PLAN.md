@@ -187,7 +187,7 @@ Adds a MailHog-backed integration test for delivery.
 **Goal:** Port `Test-BackupIntegrity` as `Get-BackupJobReport`; render and send the daily report. Verification only covers jobs with `verifyAfterBackup: true`.
 
 **Files**
-- create `src/BackupDR/Public/Get-BackupJobReport.ps1`
+- create `src/BackupDR/Public/Get-BackupJobReport.ps1` (`-JobName <string[]>`, or `-Policy` which selects the jobs with `verifyAfterBackup: true`; calls `Get-VBRBackupSession -Name <job>` per job)
 - create `src/BackupDR/Public/ConvertTo-BackupReportHtml.ps1` (ConvertTo-Html with inline CSS, status column highlighted)
 - create `tests/unit/Get-BackupJobReport.Tests.ps1`, `tests/unit/ConvertTo-BackupReportHtml.Tests.ps1`
 

@@ -6,6 +6,8 @@
     PowerShellVersion    = '5.1'
     CompatiblePSEditions = @('Desktop', 'Core')
     FunctionsToExport    = @(
+        'ConvertTo-BackupReportHtml',
+        'Get-BackupJobReport',
         'Get-BackupPolicy',
         'Send-BackupAlert',
         'Set-BackupLogPath',
