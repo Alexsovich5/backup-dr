@@ -10,6 +10,7 @@
         'Get-BackupJobReport',
         'Get-BackupPolicy',
         'Get-DRPlan',
+        'Invoke-DRPlan',
         'Send-BackupAlert',
         'Set-BackupLogPath',
         'Start-BackupJob',
