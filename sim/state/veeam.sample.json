@@ -1,0 +1,140 @@
+{
+  "jobs": [
+    {
+      "name": "Production-Servers-Daily",
+      "jobType": "Backup",
+      "state": "Stopped",
+      "nextResult": "Success",
+      "targets": ["prod-web-01", "prod-app-01", "prod-db-01"]
+    },
+    {
+      "name": "Production-Servers-Weekly-Full",
+      "jobType": "Backup",
+      "state": "Stopped",
+      "nextResult": "Success",
+      "targets": ["prod-web-01", "prod-app-01", "prod-db-01"]
+    },
+    {
+      "name": "Database-Servers-Hourly",
+      "jobType": "Backup",
+      "state": "Stopped",
+      "nextResult": "Success",
+      "targets": ["prod-db-01"]
+    },
+    {
+      "name": "File-Servers-Daily",
+      "jobType": "Backup",
+      "state": "Stopped",
+      "nextResult": "Success",
+      "targets": ["file-server-01"]
+    }
+  ],
+  "sessions": [
+    {
+      "id": "5b0c2a1e-0d7e-4c43-9a51-000000000001",
+      "jobName": "Production-Servers-Weekly-Full",
+      "state": "Stopped",
+      "result": "Success",
+      "creationTime": "-7d",
+      "endTime": "-167h",
+      "dataSize": 643171352576,
+      "backupSize": 268435456000,
+      "dedupRatio": 61,
+      "compressRatio": 68
+    },
+    {
+      "id": "5b0c2a1e-0d7e-4c43-9a51-000000000002",
+      "jobName": "Production-Servers-Daily",
+      "state": "Stopped",
+      "result": "Success",
+      "creationTime": "-50h",
+      "endTime": "-49h",
+      "dataSize": 643171352576,
+      "backupSize": 21474836480,
+      "dedupRatio": 72,
+      "compressRatio": 64
+    },
+    {
+      "id": "5b0c2a1e-0d7e-4c43-9a51-000000000003",
+      "jobName": "Production-Servers-Daily",
+      "state": "Stopped",
+      "result": "Success",
+      "creationTime": "-26h",
+      "endTime": "-25h",
+      "dataSize": 644245094400,
+      "backupSize": 22548578304,
+      "dedupRatio": 71,
+      "compressRatio": 63
+    },
+    {
+      "id": "5b0c2a1e-0d7e-4c43-9a51-000000000004",
+      "jobName": "File-Servers-Daily",
+      "state": "Stopped",
+      "result": "Success",
+      "creationTime": "-22h",
+      "endTime": "-20h",
+      "dataSize": 1099511627776,
+      "backupSize": 32212254720,
+      "dedupRatio": 80,
+      "compressRatio": 75
+    },
+    {
+      "id": "5b0c2a1e-0d7e-4c43-9a51-000000000005",
+      "jobName": "Database-Servers-Hourly",
+      "state": "Stopped",
+      "result": "Success",
+      "creationTime": "-3h",
+      "endTime": "-170m",
+      "dataSize": 214748364800,
+      "backupSize": 4294967296,
+      "dedupRatio": 85,
+      "compressRatio": 58
+    },
+    {
+      "id": "5b0c2a1e-0d7e-4c43-9a51-000000000006",
+      "jobName": "Database-Servers-Hourly",
+      "state": "Stopped",
+      "result": "Success",
+      "creationTime": "-2h",
+      "endTime": "-110m",
+      "dataSize": 214748364800,
+      "backupSize": 4831838208,
+      "dedupRatio": 84,
+      "compressRatio": 58
+    }
+  ],
+  "backups": [
+    { "name": "Production-Servers-Daily", "jobName": "Production-Servers-Daily", "creationTime": "-30d" },
+    { "name": "Production-Servers-Weekly-Full", "jobName": "Production-Servers-Weekly-Full", "creationTime": "-84d" },
+    { "name": "Database-Servers-Hourly", "jobName": "Database-Servers-Hourly", "creationTime": "-14d" },
+    { "name": "File-Servers-Daily", "jobName": "File-Servers-Daily", "creationTime": "-60d" }
+  ],
+  "restorePoints": [
+    { "id": "8e3f6c10-1a2b-4c5d-8e9f-000000000001", "backupName": "Production-Servers-Daily", "vmName": "prod-db-01", "type": "Increment", "creationTime": "-50h" },
+    { "id": "8e3f6c10-1a2b-4c5d-8e9f-000000000002", "backupName": "Production-Servers-Daily", "vmName": "prod-db-01", "type": "Increment", "creationTime": "-26h" },
+    { "id": "8e3f6c10-1a2b-4c5d-8e9f-000000000003", "backupName": "Production-Servers-Weekly-Full", "vmName": "prod-db-01", "type": "Full", "creationTime": "-14d" },
+    { "id": "8e3f6c10-1a2b-4c5d-8e9f-000000000004", "backupName": "Production-Servers-Weekly-Full", "vmName": "prod-db-01", "type": "Full", "creationTime": "-7d" },
+    { "id": "8e3f6c10-1a2b-4c5d-8e9f-000000000005", "backupName": "Database-Servers-Hourly", "vmName": "prod-db-01", "type": "Increment", "creationTime": "-3h" },
+    { "id": "8e3f6c10-1a2b-4c5d-8e9f-000000000006", "backupName": "Database-Servers-Hourly", "vmName": "prod-db-01", "type": "Increment", "creationTime": "-2h" },
+    { "id": "8e3f6c10-1a2b-4c5d-8e9f-000000000007", "backupName": "File-Servers-Daily", "vmName": "file-server-01", "type": "Increment", "creationTime": "-22h" }
+  ],
+  "replicas": [
+    {
+      "name": "prod-db-01_replica",
+      "vmName": "prod-db-01",
+      "state": "Ready",
+      "restorePoints": [
+        { "id": "c4d1e7a2-3b5c-4d6e-9f01-000000000001", "creationTime": "-2h" },
+        { "id": "c4d1e7a2-3b5c-4d6e-9f01-000000000002", "creationTime": "-1h" }
+      ]
+    }
+  ],
+  "repositories": [
+    {
+      "name": "Default Backup Repository",
+      "path": "D:\\Backups",
+      "totalBytes": 10995116277760,
+      "freeBytes": 4398046511104
+    }
+  ]
+}

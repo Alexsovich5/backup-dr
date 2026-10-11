@@ -13,3 +13,6 @@ foreach ($folder in @('Private', 'Public')) {
 }
 
 $script:LogPath = Join-Path (Join-Path $script:RepoRoot 'logs') 'backupdr.log'
+
+# Make the vendor cmdlets (real snap-in, simulator, or nothing) available to module code.
+Import-BackupDRProvider
