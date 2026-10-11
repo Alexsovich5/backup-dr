@@ -12,7 +12,8 @@
         'Send-BackupAlert',
         'Set-BackupLogPath',
         'Start-BackupJob',
-        'Test-BackupJobDue'
+        'Test-BackupJobDue',
+        'Test-RetentionCompliance'
     )
     CmdletsToExport      = @()
     VariablesToExport    = @()
