@@ -9,6 +9,7 @@
         'ConvertTo-BackupReportHtml',
         'Get-BackupJobReport',
         'Get-BackupPolicy',
+        'Get-DRPlan',
         'Send-BackupAlert',
         'Set-BackupLogPath',
         'Start-BackupJob',

@@ -1,0 +1,13 @@
+{
+  "name": "Primary-Site-To-Azure",
+  "rpoThresholdMinutes": 15,
+  "azure": { "vaultName": "rsv-dr", "recoveryPlan": "rp-primary" },
+  "failoverSteps": [
+    { "name": "Fail over DB replica", "type": "veeam_replica", "target": "prod-db-01_replica" },
+    { "name": "Fail over app tier to Azure", "type": "azure_failover", "recoveryPlan": "rp-primary" },
+    { "name": "Point app DNS at DR", "type": "dns_update", "zone": "example.local",
+      "record": "app", "failoverIp": "10.20.0.10", "primaryIp": "10.10.0.10" },
+    { "name": "Notify IT", "type": "notification", "to": "it-admin@example.local",
+      "continueOnError": true }
+  ]
+}
